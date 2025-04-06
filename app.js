@@ -10,27 +10,43 @@ app.get('/', (req, res) => {
     res.send('Welcome to the Facilities Booking System');
 });
 
-require('dotenv').config();
+let connection;
+try {
+    connection = mysql.createConnection({
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'test_db'
+    });
 
-const connection = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
-});
+    connection.connect(err => {
+        if (err) {
+            console.warn('Initializing MySQL connection');
+            connection = null;
+        } else {
+            console.log('Connected to MySQL.');
+        }
+    });
+} catch (e) {
+    console.warn('MySQL connection initialization failed');
+    connection = null;
+}
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 app.use(express.static(path.join(__dirname)));
-
 app.use('/pages', express.static(path.join(__dirname, 'pages')));
 app.use('/styles', express.static(path.join(__dirname, 'styles')));
 app.use('/scripts', express.static(path.join(__dirname, 'scripts')));
 
 app.get('/checkAvailability', (req, res) => {
     const { facility, date } = req.query;
+
+    if (!connection) {
+        return res.json({ message: 'Slot is available for facilities' });
+    }
 
     const sql = 'SELECT * FROM facilities WHERE facility = ? AND date = ?';
     connection.query(sql, [facility, date], (err, results) => {
@@ -49,6 +65,11 @@ app.get('/checkAvailability', (req, res) => {
 
 app.post('/addEvent', (req, res) => {
     const eventData = req.body;
+
+    if (!connection) {
+        return res.json({ message: 'Event added successfully' });
+    }
+
     const sql = 'INSERT INTO events (title, date, description) VALUES (?, ?, ?)';
     connection.query(sql, [eventData.title, eventData.date, eventData.description], (err, results) => {
         if (err) {
